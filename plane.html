@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>js实现飞机大战</title>
+    </head>
+    <body style="" data-mce-style="color: #0000ff;">
+        <div style="width:1000px;position:relative; left:400px ">
+            <canvas id="canvas" width="500" style="background-image: url(images/bak3.jpg);border:2px solid black; background-size:100%100%"></canvas>    
+            <img src="images/pause.PNG" style="position: absolute;top: 20px;left: 30px;" onclick="stop()"/>
+            <div style="position: absolute;top: 90px;left: 30px;font-weight: bold;font-size: 40px;color:black"><span id="score">0</span></div>
+            <input style="position: absolute;top:350px;left: 230px;" type="button" value="start" id="start" onclick="init();startHide()" />        
+            <div style="position: absolute;top: 200px;left: 180px;"><span id="rules">击中敌机得分<br>飞机撞机或敌机落地游戏结束</span></div>
+    	</div>
+        <div>子弹使用数量:<span id="showbulletnumber" style=" display:inline-block;width:40px" >0</span>/<span id="maxbulletnumber">200</span></div>
+        <div>敌机使用数量:<span id="showenemynumber" style=" display:inline-block;width:40px" >0</span>/<span id="maxenemynumber">30</span></div>
+    	<script type="text/javascript">
+    	var sp;
+        var fps=55;
+        var score=0;        
+        var boxx=0;
+        var boxy=0;0
+        var boxwidth=500;
+        var canvas = document.getElementById("canvas");
+        canvas.height = document.documentElement.clientHeight-50;
+        var boxheight = canvas.height;       
+        var planeImage;
+        var planex;
+        var planey;
+        var planewidth=60;
+        var planeheight=60;        
+        var bulletImage;
+        var allbullets = new Array();
+        var bulletwidth=16;
+        var bulletheight=16;
+        var enemyImage;
+        var allenemys = new Array();
+        var enemywidth=30;
+        var enemyheight=30;
+        var allgoods = new Array();
+        var goodswidth=30;
+        var goodsheight=30;        
+        var gameTimmer;
+        var btimmer;
+        var etimmer;
+        var goodstimmer;
+        var bulletlevel=0;      //子弹发射等级 0到4 ，
+        var bulletlivenumber=0; // 屏幕上显示出来的子弹数量
+        var misslelivenumber=0;
+        var godmode = true;   
+
+        var enemylivenumber=0; 
+        var maxbulletnumber=0;  
+        var canvas = document.getElementById('canvas');
+        var cxt = canvas.getContext('2d');
+        cxt.lineWidth=3;
+        cxt.font="10px Arial";
+
+        var misslewidth = 20;
+        var missleheight= 20;
+        var missleImage = new Image();
+        missleImage.src = "images/missle.PNG";
+        var allmissle = new Array();
+        bulletImage = new Image();
+        bulletImage.src="images/newbullet.PNG";
+        enemyImage = new Image();
+        enemyImage.src="images/enemy.PNG";
+
+        function bullet(x,y,runx){
+            var that= this;
+            that.x=x;
+            that.y=y;
+            that.runx=runx;
+            that.islive=true;
+            that.timmer=null;
+            that.run=function(){
+            if(that.y<-20||that.x<-10||that.x>1010){
+                clearInterval(that.timmer);
+                that.islive=false;
+                bulletlivenumber--;
+                }
+            else{
+                that.y-=10;
+                that.x=that.x+that.runx;
+                }
+            }
+        }
+
+        function missle(x,y,runx){
+            var that = this;
+            that.x=x;
+            that.y=y;
+            that.islive=true;
+            that.timmer=null;
+            that.runx=runx;
+            that.target=null;
+            that.run=function(){
+                if(that.x<-10||that.y<-20||that.x>boxwidth+10){
+                    clearInterval(that.timmer);
+                    that.islive = false;
+                    misslelivenumber--;
+                }
+                else{                    
+                    if(!that.target){
+                        that.y-=5;
+                        for(var i=0; i<allenemys.length;i++){
+                            if(allenemys[i].islive===true&&allenemys[i].sign===false){
+                                allenemys[i].sign = true;
+                                that.target=allenemys[i];
+                                that.runx = Math.ceil((allenemys[i].x-that.x)/10);
+                                that.x+=that.runx;                                                        
+                                break;
+                            }
+                        }
+                    }
+                    else{
+                        that.runx = Math.ceil((that.target.x-that.x)/10)>0? Math.ceil((that.target.x-that.x)/10)+5: Math.ceil((that.target.x-that.x)/10)-5;
+                        that.y-=Math.abs((that.target.x-that.x)/10)<3?25:0;
+                        that.x+=that.runx;
+
+                    }                                   
+                    
+                    
+                }
+
+            }
+        }
+
+        function enemy(x,y){
+            var that = this;
+            that.x=x;
+            that.y=y;
+            that.sign=false;
+            that.islive=true;
+            that.timmer=null;
+            that.run=function(){
+                if(that.y>boxheight){
+                    clearInterval(that.timmer);
+                    that.sign=false;
+                    that.islive=false;                   
+                    enemylivenumber--;
+                }else{
+                    that.y+=2.5;
+                }
+            }
+        }
+
+        function multiplebullets(x,y){
+            var that = this;
+            that.x=x;
+            that.y=y;
+            that.islive=true;
+            that.timmer=null;
+            that.run=function(){
+                if(that.y>boxheight||that.islive==false){
+                    clearInterval(that.timmer);
+                    that.islive=false;
+                }else{
+                    that.y+=2.5;
+                }
+            }
+        }
+        
+        
+        function beginplane(){
+            planex = boxwidth / 2 - planewidth /2 ;
+            planey = boxheight - planeheight;
+            planeImage = new Image();
+            planeImage.src="images/hero.PNG";
+        }
+        
+        function init(){
+            allenemys.length=0;            
+            allbullets.length=0;
+            allgoods.length=0
+            score=0;            
+            beginplane();
+            btimmer = setInterval(preproducebullet,250);
+            mtimmer = setInterval(producemissle,300);
+            etimmer = setInterval(produceenemy,200);
+            goodstimmer = setInterval(producegoods,15000);            
+            document.body.addEventListener('keydown',function (event){
+                switch(event.keyCode){
+                    case 37 : if(planex>boxx){sp=8}else{sp=0}planex-=sp;break;
+                    case 38 : if(planey>boxy){sp=8}else{sp=0}planey-=sp;break;
+                    case 39 : if((planex+planewidth)<boxwidth){sp=8}else{sp=0}planex+=sp;break;
+                    case 40 : if((planey+planeheight)<boxheight){sp=8}else{sp=0}planey+=sp;break;
+                    default:break;
+                }
+            },false)
+            gameTimmer = setInterval(run,1000/fps);
+        }
+        
+        
+        function drawenemy(){
+            for (var i=0;i<allenemys.length;i++){
+                if(allenemys[i].islive){
+                    cxt.drawImage(enemyImage,allenemys[i].x,allenemys[i].y,enemywidth,enemyheight);
+                }
+            }
+        }
+        
+        
+        function drawgoods(){
+            for (var i=0;i<allgoods.length;i++){
+                if(allgoods[i].islive){
+                    cxt.fillText("level",allgoods[i].x,allgoods[i].y);
+                }
+            }
+        }
+
+        function drawplane(){
+            cxt.clearRect(boxx,boxy,boxwidth,boxheight);
+            cxt.drawImage(planeImage,planex,planey,planewidth,planeheight);
+        }
+        
+        
+        function drawbullet(){
+            for(var i=0;i<allbullets.length;i++){
+                if(allbullets[i].islive){
+                    cxt.drawImage(bulletImage,allbullets[i].x,allbullets[i].y,bulletwidth,bulletheight);
+                }
+            }
+            
+        }
+
+        function drawmissle(){
+            for(var i=0;i<allmissle.length;i++){
+                if(allmissle[i].islive){
+                    cxt.drawImage(missleImage,allmissle[i].x,allmissle[i].y,misslewidth,missleheight);
+                }
+            }
+        }
+
+        function drawgodmode(){
+            if (godmode==false) return false;
+            cxt.beginPath();
+            cxt.arc(planex+planewidth/2,planey+planeheight/2,40,0,2*Math.PI);
+            cxt.stroke();
+
+        }
+
+        function produceenemy(){
+            if(allenemys.length>14){
+                for(var j=0;j<allenemys.length;j++){
+                    if(allenemys[j].islive===false){
+                        allenemys[j].islive=true;
+                        var x = Math.ceil(Math.random()*(boxwidth-planeheight));
+                        allenemys[j].x=x;
+                        allenemys[j].y=33;
+                        var timmer = setInterval(allenemys[j].run,50);
+                        allenemys[j].timmer = timmer;
+                        enemylivenumber++;
+                        break;
+                    }
+                }
+            }
+            else
+            {var x = Math.ceil(Math.random()*(boxwidth-planeheight));
+            var heroenemy = new enemy(x,33);
+            allenemys.push(heroenemy) 
+
+            var timmer= setInterval("allenemys["+ (allenemys.length-1) + "].run()",50);
+            allenemys[(allenemys.length-1)].timmer =timmer;
+            enemylivenumber++;
+            }             
+        } 
+
+        function producebullet(runx){    	    
+    	    if (allbullets.length>399){
+                for (  i = 0; i < allbullets.length; i++) {                    
+                    if (allbullets[i].islive==false){
+                        allbullets[i].islive=true;
+                        allbullets[i].x=planex+planewidth/2-8;
+                        allbullets[i].y=planey+16;  
+                        allbullets[i].runx=runx;                                  
+                        var timmer = setInterval(allbullets[i].run,50); 
+                        allbullets[i].timmer = timmer;                      
+                        bulletlivenumber++;
+                        break;
+                    }
+                    
+                }    	       
+    	    }
+            else{ 
+                var herobullet = new bullet(planex+planewidth/2-8,planey+16,runx);
+                allbullets.push(herobullet);                 
+                var timmer1= setInterval("allbullets[" + (allbullets.length-1) + "].run()",50); 
+                allbullets[(allbullets.length-1)].timmer = timmer1;
+                bulletlivenumber++;               
+            }     
+    	}	
+
+        function preproducebullet(){
+            if (bulletlevel===0) {
+                producebullet(0);            
+            }
+            else if (bulletlevel===1) {
+                producebullet(0);
+                producebullet(2);
+                producebullet(-2);
+            }
+            else if(bulletlevel===2){
+                producebullet(0);
+                producebullet(4);
+                producebullet(-4);                
+                producebullet(2);
+                producebullet(-2);
+
+            }
+            else if (bulletlevel===3) {
+                producebullet(0);
+                producebullet(4);
+                producebullet(-4);                
+                producebullet(2);
+                producebullet(-2);
+                producebullet(6);
+                producebullet(-6);
+
+            }
+            else if (bulletlevel===4){
+                producebullet(0);
+                producebullet(4);
+                producebullet(-4);                
+                producebullet(2);
+                producebullet(-2);
+                producebullet(6);
+                producebullet(-6);
+                producebullet(8);
+                producebullet(-8);
+                producebullet(10);
+                producebullet(-10);
+            }
+
+        }
+
+        function producemissle(){
+            var trackmissle = new missle(planex+planewidth/2-misslewidth/2,planey+missleheight,5);
+            allmissle.push(trackmissle);
+            var timmer = setInterval("allmissle["+(allmissle.length-1)+"].run()",50);
+            allmissle[allmissle.length-1].timmer = timmer;
+
+        }
+
+        function producegoods(){
+        	var x = Math.ceil(Math.random()*(boxwidth-planeheight));
+            var herogoods = new multiplebullets(x,33);
+            allgoods.push(herogoods);
+            allgoods[allgoods.length-1].timmer = setInterval("allgoods["+ (allgoods.length-1) + "].run()",50);
+            
+
+        }
+
+        function checkbullet(){
+            for(var i=0;i<allenemys.length;i++){
+                if(allenemys[i].islive){
+                    var e =allenemys[i];
+                    for(var j=0;j<allbullets.length;j++){
+                        if(allbullets[j].islive){
+                            var b = allbullets[j];
+                            if(b.x>e.x-bulletwidth&&b.x<e.x+enemywidth&&b.y<e.y+enemyheight&&b.y+bulletheight>e.y){                            
+                            clearInterval(e.timmer);
+                            clearInterval(b.timmer);                           
+                            enemylivenumber--;
+                            e.sign=false;
+                            b.islive=false;
+                            e.islive=false;
+                            score+=100;
+                            bulletlivenumber--;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkmissle(){
+            for(var i=0;i<allenemys.length;i++){
+                if(allenemys[i].islive){
+                    var e = allenemys[i];
+                    for(var j=0; j<allmissle.length;j++){
+                        if(allmissle[j].islive){
+                            var m = allmissle[j];
+                            if(m.x+misslewidth>e.x&&m.x<e.x+enemywidth&&m.y<e.y+enemyheight&&m.y+missleheight>e.y){
+                                clearInterval(e.timmer);
+                                clearInterval(m.timmer);
+                                misslelivenumber--;
+                                e.sign=false;
+                                e.islive=false;
+                                m.islive=false;
+                                score+=100;
+                                enemylivenumber--;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkplane(){
+            for(var i=0;i<allenemys.length;i++){
+                if(allenemys[i].islive){
+                var e = allenemys[i];
+                    if(e.x+enemywidth>planex&&e.x<planex+planewidth&&e.y>planey&&e.y<planey+planeheight){
+                        clearInterval(e.timmer);
+                        e.sign=false;
+                        e.islive=false;
+                        enemylivenumber--;
+                        stop();                        
+                    }
+                }
+            }
+        }
+        function checkgoods(){
+        	for(var i=0;i<allgoods.length;i++){
+        		if (allgoods[i].islive) {
+        			var g = allgoods[i];
+        			if (g.x+enemywidth>planex&&g.x<planex+planewidth&&g.y>planey&&g.y<planey+planeheight) {
+        				if(bulletlevel!==4){
+        					bulletlevel++;
+        				}                        
+                        clearInterval(g.timmer);
+        				g.islive = false;
+                        
+        			}
+        		}
+        	}
+        }
+
+        function drawscore(){
+        document.getElementById('score').innerHTML=score;
+        document.getElementById("showbulletnumber").innerHTML=bulletlivenumber;
+        maxbulletnumber.innerHTML = allbullets.length;
+        showenemynumber.innerHTML = enemylivenumber;
+        document.getElementById('maxenemynumber').innerHTML=allenemys.length;
+
+        }
+
+
+    	
+
+        
+        function run(){
+            drawplane();
+            drawbullet();
+            drawscore();
+            drawenemy();
+            drawgoods();
+            drawgodmode();
+            drawmissle();
+            checkbullet();
+            checkplane();
+            checkgoods();
+            checkmissle();
+        }
+
+        var rules = document.getElementById('rules');
+        var showScore = document.getElementById('showScore');
+        var start = document.getElementById('start');   
+        var showbulletnumber = document.getElementById('showbulletnumber');
+        var maxbulletnumber = document.getElementById('maxbulletnumber');
+        var showenemynumber =document.getElementById('showenemynumber');
+        
+
+        function startHide(){        
+        rules.style.display="none";        
+        start.style.display="none";            
+        }            
+
+        function stop(){                
+        clearInterval(gameTimmer);                
+        clearInterval(btimmer);                
+        clearInterval(etimmer);    
+        clearInterval(goodstimmer);           
+        cxt.clearRect(boxx,boxy,boxwidth,boxheight);                       
+        rules.style.display="";            
+        start.style.display="";            
+        }     
+	   </script>
+    </body>
+</html>
